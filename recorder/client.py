@@ -1,10 +1,11 @@
+#pylint:disable=E1101
 from socket import socket
 from zlib import decompress
 import lz4.frame
 import lz4framed
 
 import pygame
-from pygame.locals import *
+from pygame.locals import Rect
 
 WIDTH = 640
 HEIGHT = 480
@@ -43,7 +44,7 @@ def main(host='127.0.0.1', port=5000):
         while watching:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    watching = FalseE
+                    watching = False
                     break
 
             # Retreive the size of the pixels length,
