@@ -1,4 +1,3 @@
-#! python 3
 from socket import socket
 from threading import Thread
 from zlib import compress

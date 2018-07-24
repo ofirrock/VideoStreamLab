@@ -1,4 +1,3 @@
-#! python 3
 from socket import socket
 from zlib import decompress
 import lz4.frame
