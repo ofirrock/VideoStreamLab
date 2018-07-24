@@ -12,6 +12,7 @@ WIDTH = 640
 HEIGHT = 480
 
 
+# capture screenshot from display
 def retreive_screenshot(conn):
     with mss() as sct:
         # The region to capture
