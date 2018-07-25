@@ -1,4 +1,4 @@
-#pylint:disable=E1101
+# pylint:disable=E1101
 from socket import socket
 from zlib import decompress
 import lz4.frame

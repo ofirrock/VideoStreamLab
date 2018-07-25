@@ -10,6 +10,7 @@ import json
 from threading import Thread, Event
 import time
 
+
 class StoppableThread(Thread):
     """Thread class with a stop() method. The thread itself has to check
     regularly for the stopped() condition."""
@@ -24,7 +25,7 @@ class StoppableThread(Thread):
 
     def stopped(self):
         return self._stop_event.is_set()
-    
+
     def run(self):
         print("thread started for", self.client.address)
         messageData = {}
@@ -37,9 +38,11 @@ class StoppableThread(Thread):
             except:
                 print("a thread died")
                 self.client.close()
-            
+
 
 clients = {}
+
+
 class SimpleEcho(WebSocket):
 
     def handleMessage(self):
@@ -57,7 +60,7 @@ class SimpleEcho(WebSocket):
         clients[self.address]['handler'].stop()
 #        del clients[self.address]
 
-#def handleClient(client):
+# def handleClient(client):
 #    try:
 #        print("thread started for", client.address)
 #        messageData = {}
@@ -69,6 +72,7 @@ class SimpleEcho(WebSocket):
 #    except:
 #        print("a thread died")
 #        client.close()
-        
+
+
 server = SimpleWebSocketServer('', 8003, SimpleEcho)
 server.serveforever()
