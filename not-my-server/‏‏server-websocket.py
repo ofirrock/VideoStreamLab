@@ -11,7 +11,7 @@ from threading import Thread, Event
 import time
 
 SERVER_ADDRESS = ''  # '' = 0.0.0.0 -> all IPv4 addresses on the local machine
-SERVER_PORT = 8003  # low-level api socket method to find open port = 0
+SERVER_PORT = 8004  # low-level api socket method to find open port = 0
 
 
 class WebSocketStoppableThread(Thread):
@@ -44,12 +44,8 @@ class WebSocketStoppableThread(Thread):
                 print("a thread died")
                 self.webSocketClient.close()
 
-
+clients = {}
 class SimpleEcho(WebSocket):
-
-    def __init__(self):
-        super(WebSocket, self).__init__()
-        self.clients = {}
 
     def handleMessage(self):
         # echo message back to client
@@ -58,14 +54,14 @@ class SimpleEcho(WebSocket):
     def handleConnected(self):
         print(self.address, 'connected')
         webSocketHandlerThread = WebSocketStoppableThread(webSocketClient=self)
-        self.clients[self.address] = {'websocket': self,
+        clients[self.address] = {'websocket': self,
                                       'handler': webSocketHandlerThread}
         webSocketHandlerThread.start()
 
     def handleClose(self):
         print(self.address, 'closed')
-        self.clients[self.address]['handler'].stop()
-#        del self.clients[self.address]
+        clients[self.address]['handler'].stop()
+#        del clients[self.address]
 
 # def handleClient(client):
 #    try:

@@ -1,29 +1,58 @@
-import React, { Component } from 'react';
+import React, { Component, createElement } from 'react';
 import logo from './logo.svg';
 import './App.css';
-import Websocket from 'react-websocket';
+import createSocket from "sockette-component";
+
+const Sockette = createSocket({
+  Component,
+  createElement
+});
  
   class ProductDetail extends React.Component {
  
     constructor(props) {
       super(props);
       this.state = {
-        count: 90
+        socket: null,
+        count: 90,
+        currentImage: null,
       };
     }
- 
-    handleData(data) {
-      let result = JSON.parse(data);
-      this.setState({count: this.state.count + result.movement});
-    }
+
+    onOpen = ev => {
+      console.log("> Connected!", ev);
+    };
+   
+    onMessage = ev => {
+      //console.log("> Received:", ev.data);
+      //let result = JSON.parse(ev.data);
+      this.setState({currentImage: lz4.decompress(ev.data)});
+    };
+   
+    onReconnect = ev => {
+      console.log("> Reconnecting...", ev);
+      
+    };
+   
+    sendMessage = _ => {
+      // WebSocket available in state!
+      this.state.socket.send("Hello, world!");
+    };
  
     render() {
       return (
         <div>
           Count: <strong>{this.state.count}</strong>
- 
-          <Websocket url='ws://localhost:8003'
-              onMessage={this.handleData.bind(this)}/>
+          <img src={"data:image/png;base64, " + this.state.currentImage} alt="video" />
+          <Sockette
+          url="ws://localhost:8004"
+          getSocket={socket => {
+            this.setState({socket});
+          }}
+          maxAttempts={25}
+          onopen={this.onOpen}
+          onmessage={this.onMessage}
+          onreconnect={this.onReconnect}/>
         </div>
       );
     }
