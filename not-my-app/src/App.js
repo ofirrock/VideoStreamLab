@@ -26,7 +26,7 @@ const Sockette = createSocket({
     onMessage = ev => {
       //console.log("> Received:", ev.data);
       //let result = JSON.parse(ev.data);
-      this.setState({currentImage: lz4.decompress(ev.data)});
+      this.setState({currentImage: ev.data});
     };
    
     onReconnect = ev => {
