@@ -64,60 +64,28 @@ class WebSocketStoppableThread(Thread):
     def run(self):
         print("thread started")
         self.started = True
-        with mss.mss() as sct:
-            while True:
-                if not self.is_stopped():
-                    if self.res_changed():
-                        self.rect = self.new_rect
-                        self._change_resultion_event.clear()
-                    self.running = True
-                    try:
-                        # print("sending message to "
-                        #  + str(len(self.webSocketServer.clients))
-                        #  + " clients")
-                        # Capture the screen
-                        #                        messageData = {}
-                        img = sct.grab(self.rect)
-                        raw_bytes = mss.tools.to_png(
-                            img.rgb, (self.rect["width"], self.rect["height"]))
+        while True:
+            if not self.is_stopped():
+                if self.res_changed():
+                    self.rect = self.new_rect
+                    self._change_resultion_event.clear()
+                self.running = True
+                try:
+                    img = mss.mss().grab(self.rect)
+                    raw_bytes = mss.tools.to_png(img.rgb, img.size, level=9)
 #                        messageData['base64img'] = base64.encodebytes(raw_bytes)
-    #                    pixels = lz4framed.compress(img.rgb)  # compress(img.rgb, 6)
-    #
-                        img = sct.grab(rect)
-                        raw_bytes = mss.tools.to_png(img.rgb, img.size)
-                        messageData = base64.encodebytes(raw_bytes)
-    #                    pixels = lz4framed.compress(img.rgb)
-    #   # compress(img.rgb, 6)
-    #
-    #                    # Send the size of the pixels length
-    #                    size = len(pixels)
-    #                    size_len = (size.bit_length() + 7) // 8
-    #                    messageData['size_len'] = bytes([size_len])
-    #
-    #                    # Send the actual pixels length
-    #                    size_bytes = size.to_bytes(size_len, 'big')
-    #                    messageData['size_bytes'] = size_bytes
-    #
-    #                    # Send pixels
-    #                    messageData['pixels'] = pixels
 
-                        self.webSocketServer.send_message_to_all(
-                            base64.encodebytes(raw_bytes))
+                    self.webSocketServer.send_message_to_all(
+                        base64.encodebytes(raw_bytes))
 #                        time.sleep(1/60)
-                    except Exception as e:
-                        print("Exception "+str(e))
-                        ex_type, ex, tb = sys.exc_info()
-                        traceback.print_tb(tb)
-                        exit
+                except Exception as e:
+                    print("Exception "+str(e))
+                    ex_type, ex, tb = sys.exc_info()
+                    traceback.print_tb(tb)
+                    time.sleep(1)
 
-                        self.webSocketServer.send_message_to_all(messageData)
-#                        time.sleep(1/60)
-                    except TypeError as e:
-                        print("Type error({0}): {1}".format(
-                            e.errno, e.strerror))
-                        print("the thread died")
-                else:
-                    self.running = False
+            else:
+                self.running = False
 
 
 # Called for every client connecting (after handshake)
