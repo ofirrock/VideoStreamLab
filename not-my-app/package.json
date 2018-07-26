@@ -5,9 +5,11 @@
   "dependencies": {
     "lz4-asm": "^0.3.3",
     "lz4js": "^0.2.0",
+    "pondjs": "^0.8.9",
     "react": "^16.4.1",
     "react-dom": "^16.4.1",
     "react-scripts": "0.9.5",
+    "react-timeseries-charts": "^0.15.2",
     "sockette-component": "^1.0.0"
   },
   "devDependencies": {},

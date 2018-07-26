@@ -14,9 +14,12 @@ const Sockette = createSocket({
       super(props);
       this.state = {
         socket: null,
-        count: 90,
+        lastFrameTimestamp: null,
+        framesCount: 0,
+        fps: 0,
         currentImage: null,
       };
+      this.setResultion = this.setResultion.bind(this);
     }
 
     onOpen = ev => {
@@ -26,7 +29,14 @@ const Sockette = createSocket({
     onMessage = ev => {
       //console.log("> Received:", ev.data);
       //let result = JSON.parse(ev.data);
-      this.setState({currentImage: lz4.decompress(ev.data)});
+      let newTimestamp = Date.now();
+      let newfps = Math.round (1000 / (newTimestamp - this.state.lastFrameTimestamp));
+      this.setState({
+        currentImage: ev.data,
+        framesCount: this.state.framesCount+1,
+        fps: newfps,
+        lastFrameTimestamp: newTimestamp,
+      });
     };
    
     onReconnect = ev => {
@@ -38,12 +48,27 @@ const Sockette = createSocket({
       // WebSocket available in state!
       this.state.socket.send("Hello, world!");
     };
- 
+    
+    setResultion(e){
+      let width = parseInt(document.getElementById("res-width").value);
+      let height = parseInt(document.getElementById("res-height").value);
+      let resultion = {"type": "set_resolution", "width": width, "height": height};
+      console.log(JSON.stringify(resultion));
+      this.state.socket.send(JSON.stringify(resultion));
+    }
+
     render() {
       return (
         <div>
-          Count: <strong>{this.state.count}</strong>
+          <input type="text" id="fps-input" value={"FPS:" + this.state.fps} className="form-control" disabled="true" />
+          <div className="set-res-container">
+            <input type="text" id="res-width" placeholder="Width" className="set-res form-control" />
+            <input type="text" id="res-height" placeholder="Height" className="set-res form-control" />
+            <button className="set-res btn btn-primary" type="button" onClick={this.setResultion}>Set Resolution</button>
+          </div>
+          <br />
           <img src={"data:image/png;base64, " + this.state.currentImage} alt="video" />
+          <br />
           <Sockette
           url="ws://localhost:8004"
           getSocket={socket => {
@@ -62,14 +87,7 @@ class App extends Component {
   render() {
     return (
       <div className="App">
-        <div className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <h2>Welcome to React</h2>
-        </div>
         <ProductDetail />
-        <p className="App-intro">
-          To get started, edit <code>src/App.js</code> and save to reload.
-        </p>
       </div>
     );
   }
