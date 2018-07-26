@@ -44,7 +44,10 @@ class WebSocketStoppableThread(Thread):
                 print("a thread died")
                 self.webSocketClient.close()
 
+
 clients = {}
+
+
 class SimpleEcho(WebSocket):
 
     def handleMessage(self):
@@ -55,7 +58,7 @@ class SimpleEcho(WebSocket):
         print(self.address, 'connected')
         webSocketHandlerThread = WebSocketStoppableThread(webSocketClient=self)
         clients[self.address] = {'websocket': self,
-                                      'handler': webSocketHandlerThread}
+                                 'handler': webSocketHandlerThread}
         webSocketHandlerThread.start()
 
     def handleClose(self):

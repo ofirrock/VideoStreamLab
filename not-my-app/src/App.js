@@ -37,6 +37,7 @@ const Sockette = createSocket({
         fps: newfps,
         lastFrameTimestamp: newTimestamp,
       });
+      this.setState({currentImage: ev.data});
     };
    
     onReconnect = ev => {
