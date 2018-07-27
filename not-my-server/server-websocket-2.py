@@ -20,6 +20,8 @@ import base64
 import mss
 import mss.tools
 
+import psutil  # for cpu and ram usage
+
 
 WIDTH = 640
 HEIGHT = 480
@@ -64,28 +66,45 @@ class WebSocketStoppableThread(Thread):
     def run(self):
         print("thread started")
         self.started = True
-        while True:
-            if not self.is_stopped():
-                if self.res_changed():
-                    self.rect = self.new_rect
-                    self._change_resultion_event.clear()
-                self.running = True
-                try:
-                    img = mss.mss().grab(self.rect)
-                    raw_bytes = mss.tools.to_png(img.rgb, img.size, level=9)
-#                        messageData['base64img'] = base64.encodebytes(raw_bytes)
+        with mss.mss() as sct:
+            while True:
+                if not self.is_stopped():
+                    if self.res_changed():
+                        self.rect = self.new_rect
+                        self._change_resultion_event.clear()
+                    self.running = True
+                    try:
+                        # capture image
+                        img = mss.mss().grab(self.rect)
+                        # png in memory
+                        img_png = mss.tools.to_png(img.rgb, img.size)
+                        # get stats, convert img data to ascii
+                        # and save to dict object
+                        # TODO: IMPORTANT - we have a memory leak
+                        #  (look at memory percentage over time)
+                        # TODO: create a different thread for sending stats
+                        #  every 1 second
+                        data_to_send = {
+                            'cpu_usage': round(
+                                psutil.cpu_percent(), 2
+                            ),
+                            'ram_usage': round(
+                                psutil.virtual_memory().percent, 2
+                            ),
+                            'rgb': base64.b64encode(img_png)
+                            .decode('ascii')
+                        }
+                        # convert message to json and send to all clients
+                        self.webSocketServer.send_message_to_all(
+                            json.dumps(data_to_send))
+                    except Exception as e:
+                        print("Exception " + str(e))
+                        ex_type, ex, tb = sys.exc_info()
+                        traceback.print_tb(tb)
+                        time.sleep(1)
 
-                    self.webSocketServer.send_message_to_all(
-                        base64.encodebytes(raw_bytes))
-#                        time.sleep(1/60)
-                except Exception as e:
-                    print("Exception "+str(e))
-                    ex_type, ex, tb = sys.exc_info()
-                    traceback.print_tb(tb)
-                    time.sleep(1)
-
-            else:
-                self.running = False
+                else:
+                    self.running = False
 
 
 # Called for every client connecting (after handshake)
@@ -117,15 +136,23 @@ def message_received(client, server, message):
             print("setting new resolution")
             thread.set_resolution(jmessage['width'], jmessage['height'])
     except Exception as e:
-        print("Exception "+str(e))
+        print("Exception " + str(e))
         ex_type, ex, tb = sys.exc_info()
         traceback.print_tb(tb)
 
 
 PORT = 8004
-server = WebsocketServer(PORT, host='', loglevel=logging.INFO)
-server.set_fn_new_client(new_client)
-server.set_fn_client_left(client_left)
-server.set_fn_message_received(message_received)
-thread = WebSocketStoppableThread(server)
-server.run_forever()
+try:
+    server = WebsocketServer(PORT, host='', loglevel=logging.INFO)
+    server.set_fn_new_client(new_client)
+    server.set_fn_client_left(client_left)
+    server.set_fn_message_received(message_received)
+    thread = WebSocketStoppableThread(server)
+    server.run_forever()
+except KeyboardInterrupt:
+    print('W: interrupt received, stopping…')
+except Exception as e:
+    print("Exception " + str(e))
+finally:
+    print('clean up')
+    exit()
