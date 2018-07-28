@@ -7,7 +7,7 @@ Created on Tue Jul 24 2018
 
 from websocket_server import WebsocketServer
 import json
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 import time
 import sys
 import traceback
@@ -27,6 +27,9 @@ WIDTH = 640
 HEIGHT = 480
 
 
+lock = Lock()
+
+
 class WebSocketStoppableThread(Thread):
     """
     Thread class with a stop() method.
@@ -36,7 +39,7 @@ class WebSocketStoppableThread(Thread):
     def __init__(self, webSocketServer):
         super(WebSocketStoppableThread, self).__init__()
         self._stop_event = Event()
-        self._change_resultion_event = Event()
+        self._change_resolution_event = Event()
         self.webSocketServer = webSocketServer
         self.rect = {'top': 0, 'left': 0, 'width': WIDTH, 'height': HEIGHT}
         self.new_rect = {'top': 0, 'left': 0, 'width': WIDTH, 'height': HEIGHT}
@@ -56,12 +59,12 @@ class WebSocketStoppableThread(Thread):
         return self.running
 
     def res_changed(self):
-        return self._change_resultion_event.is_set()
+        return self._change_resolution_event.is_set()
 
     def set_resolution(self, w, h):
         self.new_rect['width'] = w
         self.new_rect['height'] = h
-        self._change_resultion_event.set()
+        self._change_resolution_event.set()
 
     def run(self):
         print("thread started")
@@ -70,44 +73,66 @@ class WebSocketStoppableThread(Thread):
             while True:
                 if not self.is_stopped():
                     if self.res_changed():
-                        self.rect = self.new_rect
-                        self._change_resultion_event.clear()
+                        with lock:
+                            self.rect = self.new_rect
+                            self._change_resolution_event.clear()
                     self.running = True
                     try:
-                        # capture image
-                        img = mss.mss().grab(self.rect)
-                        # png in memory
-                        img_png = mss.tools.to_png(img.rgb, img.size)
-                        # get stats, convert img data to ascii
-                        # and save to dict object
-                        # TODO: IMPORTANT - we have a memory leak
-                        #  (look at memory percentage over time)
-                        # TODO: create a different thread for sending stats
-                        #  every 1 second
-                        data_to_send = {
-                            'cpu_usage': round(
-                                psutil.cpu_percent(), 2
-                            ),
-                            'ram_usage': round(
-                                psutil.virtual_memory().percent, 2
-                            ),
-                            'rgb': base64.b64encode(img_png)
-                            .decode('ascii')
-                        }
-                        # convert message to json and send to all clients
-                        self.webSocketServer.send_message_to_all(
-                            json.dumps(data_to_send))
+                        with lock:
+                            # capture image, get raw png
+                            img_png = capture_screen(sct, self.rect)
+
+                            # get pc stats
+                            cpu_usage, ram_usage = pc_stats()
+
+                            # convert png data to base64 ascii string
+                            png_base64_ascii = raw_png_to_base64_ascii(img_png)
+
+                            # TODO: UPDATE: I think I fixed it - check overtime
+                            #  IMPORTANT - we have a memory leak
+                            #  (look at memory percentage over time)
+                            # TODO: create a different thread for sending stats
+                            #  every 1 second
+                            data_to_send = {
+                                'cpu_usage': cpu_usage,
+                                'ram_usage': ram_usage,
+                                'rgb': png_base64_ascii
+                            }
+                            # convert message to json and send to all clients
+                            self.webSocketServer.send_message_to_all(
+                                json.dumps(data_to_send))
                     except Exception as e:
                         print("Exception " + str(e))
                         ex_type, ex, tb = sys.exc_info()
                         traceback.print_tb(tb)
                         time.sleep(1)
-
+                        print('------ DEALT WITH EXCEPTION ------')
+                        sct = mss.mss()  # a must for ongoing exceptions
+                        print('\n\n------ CONTINUING ------\n\n')
                 else:
                     self.running = False
 
 
+def capture_screen(mss_ctx, rect):
+    # capture image
+    img = mss_ctx.grab(rect)
+    # png in memory
+    return mss.tools.to_png(img.rgb, img.size)
+
+
+def pc_stats():
+    cpu_usage = psutil.cpu_percent()
+    ram_usage = psutil.virtual_memory().percent
+
+    return round(cpu_usage, 2), round(ram_usage, 2)
+
+
+def raw_png_to_base64_ascii(img_png_data):
+    return base64.b64encode(img_png_data).decode('ascii')
+
 # Called for every client connecting (after handshake)
+
+
 def new_client(client, server):
     print("New client connected and was given id %d" % client['id'])
     if not thread.is_running():

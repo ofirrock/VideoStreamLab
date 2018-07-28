@@ -1,5 +1,4 @@
 import React, { Component, createElement } from 'react';
-import logo from './logo.svg';
 import './App.css';
 import createSocket from "sockette-component";
 
@@ -23,7 +22,7 @@ class ProductDetail extends React.Component {
         ram_usage: 0,
       },
     };
-    this.setResultion = this.setResolution.bind(this);
+    this.setResolution = this.setResolution.bind(this);
   }
 
   onOpen = ev => {
@@ -59,8 +58,8 @@ class ProductDetail extends React.Component {
   };
 
   setResolution(e) {
-    let width = parseInt(document.getElementById("res-width").value);
-    let height = parseInt(document.getElementById("res-height").value);
+    let width = parseInt(document.getElementById("res-width").value, 10);
+    let height = parseInt(document.getElementById("res-height").value, 10);
     let resolution = { "type": "set_resolution", "width": width, "height": height };
     console.log(JSON.stringify(resolution));
     this.state.socket.send(JSON.stringify(resolution));
@@ -83,7 +82,7 @@ class ProductDetail extends React.Component {
         <Sockette
           url="ws://localhost:8004"
           getSocket={socket => {
-            this.setState({ socket });
+            this.setState({ socket: socket });
           }}
           maxAttempts={25}
           onopen={this.onOpen}
