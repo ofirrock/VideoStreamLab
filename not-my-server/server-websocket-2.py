@@ -29,7 +29,51 @@ HEIGHT = 480
 
 lock = Lock()
 
+class WebsocketStatsThread(Thread):
+    
+    def __init__(self, webSocketServer):
+        super(WebsocketStatsThread, self).__init__()
+        self._stop_event = Event()
+        self._change_resolution_event = Event()
+        self.webSocketServer = webSocketServer
+        self.running = False
+        self.started = False 
 
+    def stop(self):
+        self._stop_event.set()
+
+    def restart(self):
+        self._stop_event.clear()
+
+    def is_stopped(self):
+        return self._stop_event.is_set()
+
+    def is_running(self):
+        return self.running
+
+    def run(self):
+        print("stats thread started")
+        self.started = True
+        while True:
+            if not self.is_stopped():
+               self.running = True
+               try:
+                   # get pc stats
+                   cpu_usage, ram_usage = pc_stats()
+                   data_to_send = {
+                        'type': 'stats',
+                        'cpu_usage': cpu_usage,
+                        'ram_usage': ram_usage,
+                    }
+                   self.webSocketServer.send_message_to_all(json.dumps(data_to_send))
+               except Exception as e:
+                   print("Exception " + str(e))
+                   ex_type, ex, tb = sys.exc_info()
+                   traceback.print_tb(tb)
+            else:
+                self.running = False
+            time.sleep(3)
+                    
 class WebSocketStoppableThread(Thread):
     """
     Thread class with a stop() method.
@@ -67,7 +111,7 @@ class WebSocketStoppableThread(Thread):
         self._change_resolution_event.set()
 
     def run(self):
-        print("thread started")
+        print("video thread started")
         self.started = True
         with mss.mss() as sct:
             while True:
@@ -81,10 +125,6 @@ class WebSocketStoppableThread(Thread):
                         with lock:
                             # capture image, get raw png
                             img_png = capture_screen(sct, self.rect)
-
-                            # get pc stats
-                            cpu_usage, ram_usage = pc_stats()
-
                             # convert png data to base64 ascii string
                             png_base64_ascii = raw_png_to_base64_ascii(img_png)
 
@@ -94,8 +134,7 @@ class WebSocketStoppableThread(Thread):
                             # TODO: create a different thread for sending stats
                             #  every 1 second
                             data_to_send = {
-                                'cpu_usage': cpu_usage,
-                                'ram_usage': ram_usage,
+                                'type': 'image',
                                 'rgb': png_base64_ascii
                             }
                             # convert message to json and send to all clients
@@ -140,6 +179,11 @@ def new_client(client, server):
             thread.start()
         else:
             thread.restart()
+        
+        if not statsThread.started:
+            statsThread.start()
+        else:
+            statsThread.restart()
 # server.send_message_to_all("Hey all, a new client has joined us")
 
 
@@ -148,6 +192,7 @@ def client_left(client, server):
     print("Client(%d) disconnected" % client['id'])
     if len(server.clients) == 1:
         thread.stop()
+        statsThread.stop()
 
 
 # Called when a client sends a message
@@ -173,6 +218,7 @@ try:
     server.set_fn_client_left(client_left)
     server.set_fn_message_received(message_received)
     thread = WebSocketStoppableThread(server)
+    statsThread = WebsocketStatsThread(server)
     server.run_forever()
 except KeyboardInterrupt:
     print('W: interrupt received, stopping…')
@@ -180,4 +226,3 @@ except Exception as e:
     print("Exception " + str(e))
 finally:
     print('clean up')
-    exit()
