@@ -8,6 +8,56 @@ const Sockette = createSocket({
   createElement
 });
 
+class Pinger extends React.Component{
+  render(){
+    return(
+      <div id="pinger">
+        <input value={this.props.status} type="text" className="form-control" disabled />
+        <button className="btn btn-primary" type="button" onClick={this.props.handler}>Ping Server</button>
+      </div>
+    );
+  }
+}
+
+class StatChart extends React.Component {
+  render(){
+    return(
+      <div className="card card-chart">
+        <div className="card-header">
+          <h5 className="card-category">{this.props.cat}</h5>
+          <h4 className="card-title">{this.props.title}</h4>
+        </div>
+        <div className="card-body">
+          <div className="chart-area">
+            <AreaChart 
+              width={600}
+              height={190}
+              data={this.props.chartData}
+              margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+            >
+              <defs>
+                <linearGradient id={this.props.datakey + "color"} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={this.props.color} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={this.props.color} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="timestamp" />
+              <YAxis type="number" domain={[0, 100]} />
+              <CartesianGrid strokeDasharray="3 3" />
+              <Tooltip />
+              <Area type="monotone" dataKey={this.props.datakey} stroke="#8884d8" fillOpacity={1} fill={"url(#"+ this.props.datakey +"color)"} />
+            </AreaChart>
+          </div>
+        </div>
+        <div className="card-footer">
+          <div className="stats">
+              <i className="now-ui-icons arrows-1_refresh-69"></i> Just Updated
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
 
 class ProductDetail extends React.Component {
 
@@ -19,6 +69,8 @@ class ProductDetail extends React.Component {
       framesCount: 0,
       fps: 0,
       currentImage: null,
+      pingerStatus: "pending",
+      videoLatency: null,
       server_stats: {
         cpu_usage: 0,
         ram_usage: 0,
@@ -28,6 +80,7 @@ class ProductDetail extends React.Component {
         ],
     };
     this.setResolution = this.setResolution.bind(this);
+    this.sendPing = this.sendPing.bind(this);
   }
 
   onOpen = ev => {
@@ -36,7 +89,7 @@ class ProductDetail extends React.Component {
 
   onMessage = ev => {
     //console.log("> Received:", ev.data);
-    let result = JSON.parse(ev.data);
+    const result = JSON.parse(ev.data);
     //console.log('cpu: ' + result.cpu_usage + ', ram: ' +  result.ram_usage)
     let newTimestamp = Date.now();
     let newfps = Math.round(1000 / (newTimestamp - this.state.lastFrameTimestamp));
@@ -47,6 +100,7 @@ class ProductDetail extends React.Component {
           framesCount: this.state.framesCount + 1,
           fps: newfps,
           lastFrameTimestamp: newTimestamp,
+          videoLatency: Date.now() - result["start_time"],
         });
         break;
       
@@ -68,6 +122,13 @@ class ProductDetail extends React.Component {
             ram_usage: result.ram_usage,
           },
           chartData: newChartData,
+        });
+        break;
+
+      case 'ping':
+        let duration = Date.now() - result["start_time"];
+        this.setState({
+          pingerStatus: "Response received. (" + duration + "ms); Video latency: (" + this.state.videoLatency + "ms)"
         });
         break;
       
@@ -94,7 +155,44 @@ class ProductDetail extends React.Component {
     this.state.socket.send(JSON.stringify(resolution));
   }
 
+  sendPing(e) {
+    let pingMessage = {"type": "ping", "start_time": Date.now()};
+    console.log(this.state.socket);
+    switch(this.state.socket.readyState){
+      case 0:
+        this.setState({
+          pingerStatus: "The connection is not yet open."
+        });
+        break;
+      
+      case 1:
+        this.state.socket.send(JSON.stringify(pingMessage));
+        this.setState({
+          pingerStatus: "Ping sent."
+        });
+        break;
+
+      case 2:
+        this.setState({
+          pingerStatus: "The connection is in the process of closing."
+        });
+        break;
+
+      case 3:
+        this.setState({
+          pingerStatus: "The connection is closed or couldn't be opened."
+        });
+        break;
+
+      default:
+        this.setState({
+          pingerStatus: "Something went wrong."
+        });
+    }
+  }
+
   render() {
+    const newData = this.state.chartData.slice(-15);
     return (
       <div>
         <div className="panel-header panel-header-lg">
@@ -106,6 +204,7 @@ class ProductDetail extends React.Component {
           <input type="text" id="res-height" placeholder="Height" className="set-res form-control" />
           <button className="set-res btn btn-primary" type="button" onClick={this.setResolution}>Set Resolution</button>
         </div>
+        <Pinger status={this.state.pingerStatus} handler={this.sendPing} />
         <br />
         <img src={"data:image/png;base64, " + this.state.currentImage} alt="video" />
         <br />
@@ -124,109 +223,13 @@ class ProductDetail extends React.Component {
         <div className="content">
           <div className="row">
             <div className="col-lg-4">
-              <div className="card card-chart">
-                <div className="card-header">
-                  <h5 className="card-category">Server Load</h5>
-                  <h4 className="card-title">RAM Usage</h4>
-                </div>
-                <div className="card-body">
-                  <div className="chart-area">
-                    <AreaChart 
-                      width={600}
-                      height={190}
-                      data={this.state.chartData.slice()}
-                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                    >
-                      <defs>
-                        <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="timestamp" />
-                      <YAxis type="number" domain={[0, 100]}/>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="ram" stroke="#82ca9d" fillOpacity={1} fill="url(#colorUv)" />
-                    </AreaChart>
-                  </div>
-                </div>
-                <div className="card-footer">
-                  <div className="stats">
-                      <i className="now-ui-icons arrows-1_refresh-69"></i> Just Updated
-                  </div>
-                </div>
-              </div>
+              <StatChart cat="Server Load" title="RAM Usage" chartData={newData} color="#8884d8" datakey="ram" />
             </div>
             <div className="col-lg-4">
-              <div className="card card-chart">
-                <div className="card-header">
-                  <h5 className="card-category">Server Load</h5>
-                  <h4 className="card-title">CPU Usage</h4>
-                </div>
-                <div className="card-body">
-                  <div className="chart-area">
-                    <AreaChart 
-                      width={600}
-                      height={190}
-                      data={this.state.chartData.slice()}
-                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                    >
-                      <defs>
-                        <linearGradient id="colorPv" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#82ca9d" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="timestamp" />
-                      <YAxis type="number" domain={[0, 100]}/>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="cpu" stroke="#8884d8" fillOpacity={1} fill="url(#colorPv)" />
-                    </AreaChart>
-                  </div>
-                </div>
-                <div className="card-footer">
-                  <div className="stats">
-                      <i className="now-ui-icons arrows-1_refresh-69"></i> Just Updated
-                  </div>
-                </div>
-              </div>
+              <StatChart cat="Server Load" title="CPU Usage" chartData={newData} color="#82ca9d" datakey="cpu" />
             </div>
             <div className="col-lg-4">
-              <div className="card card-chart">
-                <div className="card-header">
-                  <h5 className="card-category">Performance</h5>
-                  <h4 className="card-title">FPS</h4>
-                </div>
-                <div className="card-body">
-                  <div className="chart-area">
-                    <AreaChart 
-                      width={600}
-                      height={190}
-                      data={this.state.chartData.slice()}
-                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                    >
-                      <defs>
-                        <linearGradient id="colorDv" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#cc3232" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#cc3232" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="timestamp" />
-                      <YAxis />
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="fps" stroke="#8884d8" fillOpacity={1} fill="url(#colorDv)" />
-                    </AreaChart>
-                  </div>
-                </div>
-                <div className="card-footer">
-                  <div className="stats">
-                      <i className="now-ui-icons arrows-1_refresh-69"></i> Just Updated
-                  </div>
-                </div>
-              </div>
+              <StatChart cat="Performance" title="FPS" chartData={newData} color="#cc3232" datakey="fps" />
             </div>
           </div>
         </div>

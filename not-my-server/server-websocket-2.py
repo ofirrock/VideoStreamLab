@@ -72,7 +72,7 @@ class WebsocketStatsThread(Thread):
                    traceback.print_tb(tb)
             else:
                 self.running = False
-            time.sleep(3)
+            time.sleep(5)
                     
 class WebSocketStoppableThread(Thread):
     """
@@ -123,6 +123,7 @@ class WebSocketStoppableThread(Thread):
                     self.running = True
                     try:
                         with lock:
+                            startTime = int(round(time.time() * 1000))
                             # capture image, get raw png
                             img_png = capture_screen(sct, self.rect)
                             # convert png data to base64 ascii string
@@ -135,6 +136,7 @@ class WebSocketStoppableThread(Thread):
                             #  every 1 second
                             data_to_send = {
                                 'type': 'image',
+                                'start_time': startTime,
                                 'rgb': png_base64_ascii
                             }
                             # convert message to json and send to all clients
@@ -205,6 +207,11 @@ def message_received(client, server, message):
         if jmessage["type"] == "set_resolution":
             print("setting new resolution")
             thread.set_resolution(jmessage['width'], jmessage['height'])
+        elif jmessage["type"] == "ping":
+            print("responding to ping")
+            response = {"type": "ping", "start_time":  jmessage["start_time"]}
+            server.send_message(client, json.dumps(response))
+
     except Exception as e:
         print("Exception " + str(e))
         ex_type, ex, tb = sys.exc_info()
