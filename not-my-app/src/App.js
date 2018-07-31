@@ -1,7 +1,7 @@
 import React, { Component, createElement } from 'react';
 import './App.css';
 import createSocket from "sockette-component";
-import { AreaChart, Area, YAxis, XAxis, Tooltip, CartesianGrid} from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, YAxis, XAxis, Tooltip, CartesianGrid} from 'recharts';
 
 const Sockette = createSocket({
   Component,
@@ -20,6 +20,20 @@ class Pinger extends React.Component{
 }
 
 class StatChart extends React.Component {
+  shouldComponentUpdate(nextProps, nextState){
+    if(nextProps.chartData.length === 0){
+      return false;
+    }
+    if(this.props.chartData.length === 0){
+      return true;
+    }
+    if (this.props.chartData[this.props.chartData.length - 1]["timestamp"]
+       === nextProps.chartData[nextProps.chartData.length - 1]["timestamp"]){
+      return false;
+    }
+    return true;
+  }
+
   render(){
     return(
       <div className="card card-chart">
@@ -29,8 +43,8 @@ class StatChart extends React.Component {
         </div>
         <div className="card-body">
           <div className="chart-area">
+          <ResponsiveContainer width="100%">
             <AreaChart 
-              width={600}
               height={190}
               data={this.props.chartData}
               margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
@@ -47,6 +61,7 @@ class StatChart extends React.Component {
               <Tooltip />
               <Area type="monotone" dataKey={this.props.datakey} stroke="#8884d8" fillOpacity={1} fill={"url(#"+ this.props.datakey +"color)"} />
             </AreaChart>
+          </ResponsiveContainer>
           </div>
         </div>
         <div className="card-footer">
@@ -69,7 +84,7 @@ class ProductDetail extends React.Component {
       framesCount: 0,
       fps: 0,
       currentImage: null,
-      pingerStatus: "pending",
+      pingerStatus: "Pending.",
       videoLatency: null,
       server_stats: {
         cpu_usage: 0,
@@ -193,22 +208,34 @@ class ProductDetail extends React.Component {
 
   render() {
     const newData = this.state.chartData.slice(-15);
+
     return (
       <div>
         <div className="panel-header panel-header-lg">
-        <input type="text" id="fps-input" value={"FPS: " + this.state.fps} className="form-control" disabled="true" />
-        <input type="text" id="cpu-input" value={"CPU Usage: " + this.state.server_stats.cpu_usage + "%"} disabled="true" />
-        <input type="text" id="ram-input" value={"RAM Usage: " + this.state.server_stats.ram_usage + "%"} disabled="true" />
-        <div className="set-res-container">
-          <input type="text" id="res-width" placeholder="Width" className="set-res form-control" />
-          <input type="text" id="res-height" placeholder="Height" className="set-res form-control" />
-          <button className="set-res btn btn-primary" type="button" onClick={this.setResolution}>Set Resolution</button>
-        </div>
-        <Pinger status={this.state.pingerStatus} handler={this.sendPing} />
-        <br />
-        <img src={"data:image/png;base64, " + this.state.currentImage} alt="video" />
-        <br />
-        <Sockette
+          <input type="text" id="fps-input" value={"FPS: " + this.state.fps} className="form-control" disabled="true" />
+          <div id="server-load-summary">
+            <div className="pb-round-large">
+              <div class="pb-container pb-cpu" style={{width: this.state.server_stats.cpu_usage+"%"}}>
+                <span>{"CPU Usage: " + this.state.server_stats.cpu_usage + "%"}</span>
+              </div>
+            </div>
+            <div className="pb-round-large">
+              <div class="pb-container pb-ram" style={{width: this.state.server_stats.ram_usage+"%"}}>
+                <span>{"RAM Usage: " + this.state.server_stats.ram_usage + "%"}</span>
+              </div>
+            </div>
+
+          </div>
+          <div className="set-res-container">
+            <input type="text" id="res-width" placeholder="Width" className="set-res form-control" />
+            <input type="text" id="res-height" placeholder="Height" className="set-res form-control" />
+            <button className="set-res btn btn-primary" type="button" onClick={this.setResolution}>Set Resolution</button>
+          </div>
+          <Pinger status={this.state.pingerStatus} handler={this.sendPing} />
+          <br />
+          <img src={"data:image/png;base64, " + this.state.currentImage} alt="video" />
+          <br />
+          <Sockette
           url="ws://localhost:8004"
           getSocket={socket => {
             this.setState({ socket: socket });
